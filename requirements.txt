@@ -1,18 +1,10 @@
 streamlit==1.37.1
-
-# 針對 3.12 / 3.13 分別給可裝的版本
-numpy==1.26.4; python_version < "3.13"
-numpy>=2.0;    python_version >= "3.13"
-
-pandas==2.2.2; python_version < "3.13"
-pandas>=2.2.3; python_version >= "3.13"
-
-matplotlib==3.8.4; python_version < "3.13"
-matplotlib>=3.9.0; python_version >= "3.13"
-
+numpy>=2.0
+pandas>=2.2.3
+matplotlib>=3.9.0
 openpyxl==3.1.5
-xlsxwriter==3.2.0
+XlsxWriter==3.2.0
 
-# OR-Tools：
-ortools==9.10.4067; python_version < "3.13"      # 你原本的版本（對 3.12）
-ortools==9.13.4784; python_version >= "3.13"     # 與 protobuf<6 相容
+# 這兩行是關鍵
+protobuf>=5.29,<6
+ortools>=9.12,<9.13
