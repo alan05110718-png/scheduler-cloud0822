@@ -1,4 +1,7 @@
-# app.py
+import sys, streamlit as st
+st.sidebar.info(f"Python: {sys.version}")
+
+#app.py
 import os
 import io
 import time
