@@ -1,18 +1,1 @@
-streamlit==1.37.1
 
-# 對 3.12/3.13 各自選可裝版本
-numpy==1.26.4; python_version < "3.13"
-numpy>=2.0;    python_version >= "3.13"
-
-pandas==2.2.2; python_version < "3.13"
-pandas>=2.2.3; python_version >= "3.13"
-
-matplotlib==3.8.4; python_version < "3.13"
-matplotlib>=3.9.0; python_version >= "3.13"
-
-openpyxl==3.1.5
-xlsxwriter==3.2.0
-
-# or-tools：舊版不支援 3.13，3.13 改裝新版
-ortools==9.10.4067; python_version < "3.13"
-ortools>=9.14.6206; python_version >= "3.13"
