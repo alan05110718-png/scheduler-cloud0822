@@ -1,3 +1,6 @@
+import streamlit as st
+st.set_page_config(page_title="排程雲端執行器", layout="wide")
+
 # ===== app0822.py（修正版骨架） =====
 import os
 import re
