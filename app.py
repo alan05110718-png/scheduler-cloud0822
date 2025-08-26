@@ -1,9 +1,9 @@
+# ===============================
+# app.py － 雲端執行器
+# ===============================
 
-# app.py
-import sys, streamlit as st
-st.sidebar.info(f"Python: {sys.version}")
-
-#app.py
+# --- 標準匯入（這裡可以匯入任何東西，但先不要用 st.xxx）---
+import sys
 import os
 import io
 import time
@@ -11,14 +11,22 @@ import inspect
 from datetime import datetime
 from typing import List, Tuple, Dict
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-# === 這行很重要：匯入你的現成程式 ===
-import app0822 as core  # 確保同資料夾有 app0822.py
+# ✅ 一定要是第一個 Streamlit 指令
+st.set_page_config(page_title="排程雲端執行器", layout="wide")
 
+# --- （可選）安全匯入你的核心模組 ---
+# 確保同資料夾有 app0822.py；若沒有，顯示友善訊息
+try:
+    import app0822 as core  # 你要呼叫的現成程式
+except Exception as e:
+    core = None
+    st.error("找不到或無法載入 `app0822.py`。請把 app0822.py 放到與 app.py 同一資料夾，或修正檔名。")
+    st.exception(e)
 
-# 監看檔案變動：抓出新檔或被覆蓋更新的檔案（用修改時間判斷）
+# --- 小工具：監看輸出檔案變動 ---
 def snapshot_tree(root: str) -> Dict[str, float]:
     snap = {}
     for base, _, files in os.walk(root):
@@ -30,7 +38,6 @@ def snapshot_tree(root: str) -> Dict[str, float]:
                 pass
     return snap
 
-
 def diff_tree(before: Dict[str, float], after: Dict[str, float]) -> List[str]:
     out = []
     for p, mt in after.items():
@@ -38,21 +45,26 @@ def diff_tree(before: Dict[str, float], after: Dict[str, float]) -> List[str]:
             out.append(p)
     return sorted(out)
 
-
 # 嘗試尋找可當入口的函式，依常見命名順位
 CANDIDATE_FUNCS = [
     "main", "run", "app", "schedule_all", "run_scheduler",
     "pipeline", "execute", "start", "solve_injection"
 ]
 
-
 def find_entrypoints(module) -> List[str]:
+    if module is None:
+        return []
     found = []
     for name in CANDIDATE_FUNCS:
         if hasattr(module, name) and callable(getattr(module, name)):
             found.append(name)
     return found
 
+def _offer_df_download(df: pd.DataFrame, filename: str):
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False)
+    st.download_button("下載結果（Excel）", bio.getvalue(), file_name=filename)
 
 def call_entrypoint(func, uploaded_path: str):
     """
@@ -70,11 +82,13 @@ def call_entrypoint(func, uploaded_path: str):
     elif len(params) == 1:
         ret = func(uploaded_path)
     else:
-        st.warning(f"偵測到入口函式 `{func.__name__}` 需要 {len(params)} 個參數，我目前只會傳 0 或 1 個參數。請在 app0822.py 包一層只收 0/1 參數的入口函式。")
+        st.warning(
+            f"偵測到入口函式 `{func.__name__}` 需要 {len(params)} 個參數，"
+            f"我目前只會傳 0 或 1 個參數。請在 app0822.py 包一層只收 0/1 參數的入口函式。"
+        )
         return None
 
-    # 嘗試把回傳結果以可視化方式呈現
-    # 1) DataFrame 或 list[DataFrame]
+    # 回傳結果視覺化
     if isinstance(ret, pd.DataFrame):
         st.subheader("執行結果（DataFrame）")
         st.dataframe(ret)
@@ -84,13 +98,11 @@ def call_entrypoint(func, uploaded_path: str):
         for i, df in enumerate(ret, 1):
             st.markdown(f"**表格 {i}**")
             st.dataframe(df)
-        # 打包成一個 Excel 多工作表
         bio = io.BytesIO()
         with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
             for i, df in enumerate(ret, 1):
                 df.to_excel(writer, sheet_name=f"Sheet{i}", index=False)
         st.download_button("下載所有表格（Excel）", bio.getvalue(), file_name="results.xlsx")
-    # 2) 其他型態僅顯示
     else:
         if ret is not None:
             st.subheader("執行回傳（原樣顯示）")
@@ -98,23 +110,14 @@ def call_entrypoint(func, uploaded_path: str):
 
     return ret
 
-
-def _offer_df_download(df: pd.DataFrame, filename: str):
-    bio = io.BytesIO()
-    with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False)
-    st.download_button("下載結果（Excel）", bio.getvalue(), file_name=filename)
-
-
-# === Streamlit UI ===
-st.set_page_config(page_title="排程雲端執行器", layout="wide")
+# --- Streamlit 介面 ---
 st.title("📦 Excel → 一鍵執行 app0822.py → 下載結果")
 
 with st.sidebar:
     st.header("設定")
+    st.info(f"Python: {sys.version}")  # ← 你的版本資訊搬到這裡（set_page_config 之後）
     save_dir = st.text_input("上傳儲存資料夾", value="uploaded")
-    watch_dirs = st.text_input("監看輸出資料夾（以逗號分隔）",
-                               value="暫存資料夾,排程紀錄資料夾")
+    watch_dirs = st.text_input("監看輸出資料夾（以逗號分隔）", value="暫存資料夾,排程紀錄資料夾")
     st.caption("說明：執行前後比對這些資料夾，列出新產生/覆蓋的檔案供下載。")
 
 os.makedirs(save_dir, exist_ok=True)
@@ -128,7 +131,10 @@ with st.expander("偵測到的入口函式", expanded=True):
     if entrypoints:
         st.write("依優先序：", entrypoints)
     else:
-        st.error("在 app0822.py 裡找不到常見的入口函式（如 main/run/schedule_all）。\n請在 app0822.py 增加一個例如 `def main(path=None): ...` 的薄包裝。")
+        st.error(
+            "在 app0822.py 裡找不到常見的入口函式（如 main/run/schedule_all）。\n"
+            "請在 app0822.py 增加一個例如 `def main(path=None): ...` 的薄包裝。"
+        )
 
 chosen = None
 if entrypoints:
@@ -136,7 +142,7 @@ if entrypoints:
 
 run_btn = st.button("🚀 開始執行", type="primary", disabled=(chosen is None or uploaded is None))
 
-if run_btn and uploaded is not None and chosen is not None:
+if run_btn and uploaded is not None and chosen is not None and core is not None:
     # 將使用者上傳存到本機
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     uploaded_path = os.path.join(save_dir, f"input_{ts}.xlsx")
